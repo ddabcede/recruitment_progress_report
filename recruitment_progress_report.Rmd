@@ -1,0 +1,216 @@
+---
+title: "Weekly Recruitment report"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(flexdashboard)
+getwd()
+setwd("/Users/deniseabcede/Desktop/wklyreport")
+
+```
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+### Weekly
+
+```{r}
+rm(list=ls())
+setwd("/Users/deniseabcede/Desktop/wklyreport")
+df <- read.csv("wkly_scrnr_rport_41621_github.csv")
+
+
+library(gt)
+library(tidyverse)
+library(glue)
+library(dplyr)
+
+# dates will change week to week
+current_date <- "4/16/21"
+current_range <- "4/12/21-4/16/21"
+former_date <- "4/9/21"
+
+df <- df[!is.na(df$screenid), ]
+# if screenid is blank/missing, drop the rows
+
+
+df$count <-as.numeric(ave(df$assigned_staff, df$assigned_staff,FUN=length))
+# find count without making var categorical(yet)
+df1 <- df[order(df$assigned_staff, decreasing=TRUE), ]
+# order var in decr order for organization of data
+
+
+df$assigned_staff <- factor(df$assigned_staff)
+df2 <- df1 %>% count("staff"=df1$assigned_staff, sort=TRUE)
+# count staff in aggregated assigned_staff
+df2 <- df2[order(df2$staff, decreasing=TRUE), ]
+
+df2$week_total <- sum(df2$n)
+# week_total is the sum of n (represents individual calls for the week)
+df2$date <- {current_date}
+df2$goal <- ifelse(df2$staff == "YM", 10,
+                  ifelse(df2$staff == "LP", 25,
+                         ifelse(df2$staff == "LG", 33,
+                               ifelse(df2$staff == "DA",34,
+                                      ifelse(df2$staff == "AK", 8,
+                                             ifelse(df2$staff == "CF", 0,0))))))
+
+
+df_past <- read.csv("wkly_scrnr_rport_4921_github.csv")
+df_past <- df_past[!is.na(df_past$screenid), ]
+df_past$count <-as.numeric(ave(df_past$assigned_staff, df_past$assigned_staff,FUN=length))
+df_p1 <- df_past[order(df_past$assigned_staff, decreasing=TRUE), ]
+
+df_p1$assigned_staff <- factor(df_p1$assigned_staff)
+df_p1<- df_p1 %>% count("staff"=df_p1$assigned_staff, sort=TRUE)
+df_p1 <- df_p1[order(df_p1$staff, decreasing=TRUE), ]
+df_p1$week_total <- sum(df_p1$n)
+df_p1$date <- {former_date}
+df_p1$goal <- ifelse(df_p1$staff == "YM", 10,
+                  ifelse(df_p1$staff == "LP", 25,
+                         ifelse(df_p1$staff == "LG", 33,
+                               ifelse(df_p1$staff == "DA",34,
+                                      ifelse(df_p1$staff == "AK", 8,
+                                             ifelse(df_p1$staff == "CF", 0,0))))))
+
+
+df_tbl <- rbind(df_p1,df2) 
+df_tbl <- df_tbl[,c(4,1,5,2,3), ]
+# row bind but ensure columns match
+# reorder columns
+
+
+gt_tbl <- 
+    df_tbl %>% 
+    gt(rowname_col="date")
+
+# removes date so you can add a line alignment for that column
+  
+gt_tbl <- 
+    gt_tbl %>% 
+    tab_stubhead(label="date")
+# adds the line alignment + new label for column you just took out name for  
+ gt_tbl <- 
+   gt_tbl %>% 
+   tab_header(
+     title=md("**Staff Calls**"),
+     subtitle= {current_range}) %>% 
+   tab_style(
+     style=list(
+       cell_fill(color="light blue"),
+       cell_text(weight="bold")
+     ),
+     locations = cells_body(
+       columns=vars(week_total)
+     )
+   )
+ 
+
+# md("**text**") bolds "text"
+ # tab_style() adds color where you want it, can be done to rows as well
+ # tab_header is for title and subtitle
+ 
+  
+# Create 2 row groups w/ 'tab_row_group()' function
+ # Group the rows in opposite order you want to see it in
+gt_tbl <- 
+  gt_tbl %>% 
+    tab_row_group(
+      group="current",
+      rows= 6:10
+  ) %>% 
+  
+    tab_row_group(
+      group="former",
+      rows= 1:5
+  )
+
+# view table
+gt_tbl
+
+
+
+```
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Weekly
+
+```{r}
+###donut chart to identify screen outcomes of recruitment calls
+# install.packages("ggplot2")
+library("ggplot2") #data visualization
+# library("dplyr") for data manipulation
+
+df1$ScreenOutcomeDate <- as.Date (df1$ScreenOutcomeDate, "%m/%d/%y")
+
+df1_so <- df1[ df1$ScreenOutcomeDate>= "2021-04-12" & df1$ScreenOutcomeDate<= "2021-04-16", ]
+
+# unique(df1_so$ScreenOutcome)
+# sum(is.na(df1_so$ScreenOutcome))
+# # table(df_so_c$ScreenOutcome)
+# table(df1_so$ScreenOutcome)
+
+#create data
+so <- data.frame(
+  category=c(
+            "wrong number",
+             "declined screening",
+            "partial screening",
+            "eligble, sched. consent",
+             "screened ineligible",
+            "out of area",
+            "other",
+             "left vm/blank outcome"),
+  count=c(3,9,4,6,4,2,5,15)
+)
+#compute percentages
+so$fraction = so$count/ sum(so$count)
+#compute the cumulative percentages
+so$ymax = cumsum(so$fraction)
+#compute bottom of each rectangle
+so$ymin = c(0, head(so$ymax, n=-1))
+#compute label position
+so$labelPosition <- (so$ymax+so$ymin)/2
+#compute a good label
+so$label <- paste0(so$category,"\n value:", so$count)
+so$percent <- ((so$count/sum(so$count))*100) 
+so$percent <- round(so$percent, digits=0)
+# so$label1 <- paste0(so$category," \n", so$percent," %")
+so$label1 <- paste0(so$percent," %")
+#make plot
+ggplot(so, aes(ymax=ymax, ymin=ymin, xmax=6, xmin=1, fill=category))+
+  geom_rect() +
+  geom_text(x=5, aes(y=labelPosition,label=label1), size=2.35)+
+scale_fill_brewer(palette=17)+
+  coord_polar(theta="y") +
+  xlim(c(0,6))+
+  theme_void()+
+  ggtitle("Screen Outcomes")+
+  theme(plot.title=element_text(hjust=0.5))+
+  theme(plot.title=element_text(size=20))
+```
+
+### Monthly
+
+```{r}
+rm(list=ls())
+library(flexdashboard)
+library(ggplot2)
+mo <- read.csv("monthoutcomes.csv")
+mo$month <- factor(mo$month, levels = c("sept2020","oct2020","nov2020","dec2020", "jan2021","feb2021","mar2021","apr2021"))
+
+options(repr.plot.width = 900, repr.plot.height = 600)
+sc <- ggplot(mo, aes(x=month, y=status_freq)) + geom_col(aes(fill=status), width = 0.7)+ theme(panel.background = element_blank())
+
+print(sc+labs(y = "frequency", x = "month"))
+
+```
+
+
